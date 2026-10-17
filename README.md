@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LogoApp
 
-## Getting Started
+Приложение для логопеда: ученики, расписание, домашние задания, абонементы, карта звуков и аналитика. Три кабинета: логопед, родитель, администратор. Один веб-сайт, который также упаковывается в приложения для iPhone и Android (Capacitor).
 
-First, run the development server:
+План и анализ: [LogoApp: анализ и план MVP](https://claude.ai/code/artifact/414521df-4a26-4fea-a6a7-64bb3bce7fa9).
+
+## Что умеет MVP
+
+| Кабинет | Возможности |
+| --- | --- |
+| Логопед | Ученики и карточки (заключение, программа, заметки), приглашение родителя по ссылке, расписание на неделю с повторяющимися занятиями, отметка «проведено / пропуск / отмена», заметки к занятию и комментарий для родителя, библиотека материалов с тегами, выдача домашек одному или нескольким ученикам, проверка с оценкой, карта звуков по этапам, тарифы и абонементы с автосписанием, учёт оплат и долгов, бланки диагностики, аналитика, уведомления |
+| Родитель | Несколько детей в одном аккаунте, ближайшие занятия и комментарии логопеда, домашки с отправкой фото и записи голоса прямо из приложения, карта звуков и программа, остаток абонемента и реквизиты для оплаты, анкета о ребёнке |
+| Админ | Сводка по платформе, пользователи и блокировка, общая библиотека материалов для всех логопедов |
+
+## Запуск локально
+
+Нужны Node.js 22 и PostgreSQL 16.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env          # пропишите DATABASE_URL и AUTH_SECRET
+npm install
+npx prisma migrate dev        # создаст таблицы
+npm run db:seed               # демо-данные
+npm run dev                   # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Демо-входы (пароль у всех `demo123`): логопед `logoped@demo.ru`, родитель `+79990000001`, админ `admin@demo.ru`. Ссылка-приглашение для проверки входа нового родителя: `/invite/demo-vera`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Сервер
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+AUTH_SECRET=$(openssl rand -base64 32) docker compose up -d --build
+```
 
-## Learn More
+Поднимет PostgreSQL и приложение на порту 3000, миграции применяются при старте. Файлы хранятся в томе `uploads`. Данные детей — персональные данные, поэтому сервер должен быть в России (152-ФЗ): Timeweb Cloud, Selectel, Yandex Cloud.
 
-To learn more about Next.js, take a look at the following resources:
+## Мобильные приложения
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Оболочка Capacitor открывает сайт с сервера, поэтому обновления приходят без выпуска новой версии в сторах.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm i -D @capacitor/ios @capacitor/android
+npx cap add ios && npx cap add android
+LOGOAPP_URL=https://ваш-домен.ru npx cap sync
+npx cap open ios        # Xcode, нужен Mac
+npx cap open android    # Android Studio
+```
 
-## Deploy on Vercel
+Перед публикацией: в iOS добавить в `Info.plist` `NSMicrophoneUsageDescription` и `NSCameraUsageDescription` (запись голоса и фото к домашкам), в Android — разрешения `RECORD_AUDIO` и `CAMERA`. Для одобрения в App Store стоит подключить push-уведомления (`@capacitor/push-notifications`): «просто сайт в обёртке» Apple отклоняет.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Устройство
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `src/app/therapist`, `src/app/parent`, `src/app/admin` — три кабинета; `src/app/actions` — серверные действия.
+- `prisma/schema.prisma` — схема базы, `prisma/seed.ts` — демо-данные.
+- `src/lib/billing.ts` — списание занятий из абонемента: проведённые и пропуски списываются, отмены — нет.
+- `src/lib/diagnostics.ts` — шаблоны анкет и бланков.
+- `src/app/api/files/[id]` — выдача загруженных файлов только тем, кому они положены.

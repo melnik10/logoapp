@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: logoapp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-logoapp}
+      POSTGRES_DB: logoapp
+    volumes:
+      - db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://logoapp:${DB_PASSWORD:-logoapp}@db:5432/logoapp
+      AUTH_SECRET: ${AUTH_SECRET:?Задайте AUTH_SECRET}
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  db:
+  uploads:
