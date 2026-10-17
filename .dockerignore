@@ -1,0 +1,7 @@
+node_modules
+.next
+uploads
+.env
+.git
+mobile/ios
+mobile/android

@@ -1,0 +1,327 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  THERAPIST
+  PARENT
+  ADMIN
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String?   @unique
+  phone          String?   @unique
+  passwordHash   String
+  name           String
+  role           Role
+  blocked        Boolean   @default(false)
+  // Логопед: реквизиты для оплаты, которые видит родитель
+  paymentDetails String?
+  about          String?
+  createdAt      DateTime  @default(now())
+
+  students       Student[]         @relation("TherapistStudents")
+  children       StudentParent[]
+  lessons        Lesson[]          @relation("TherapistLessons")
+  tariffs        Tariff[]
+  subscriptions  Subscription[]    @relation("TherapistSubscriptions")
+  payments       Payment[]         @relation("TherapistPayments")
+  materials      Material[]
+  homeworks      Homework[]        @relation("TherapistHomeworks")
+  submissions    HomeworkSubmission[]
+  attachments    Attachment[]
+  notifications  Notification[]
+  invites        Invite[]
+  diagnostics    DiagnosticForm[]
+}
+
+enum StudentStatus {
+  ACTIVE
+  PAUSED
+  FINISHED
+}
+
+model Student {
+  id          String        @id @default(cuid())
+  therapistId String
+  therapist   User          @relation("TherapistStudents", fields: [therapistId], references: [id], onDelete: Cascade)
+  firstName   String
+  lastName    String?
+  birthDate   DateTime?
+  conclusion  String? // логопедическое заключение
+  program     String? // индивидуальная программа / цели на период
+  notes       String? // заметки, видит только логопед
+  status      StudentStatus @default(ACTIVE)
+  color       String        @default("#7c3aed")
+  createdAt   DateTime      @default(now())
+
+  parents       StudentParent[]
+  lessons       Lesson[]
+  series        LessonSeries[]
+  subscriptions Subscription[]
+  payments      Payment[]
+  homeworks     Homework[]
+  sounds        SoundProgress[]
+  soundLogs     SoundProgressLog[]
+  invites       Invite[]
+  diagnostics   DiagnosticForm[]
+}
+
+model StudentParent {
+  studentId String
+  parentId  String
+  relation  String?
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parent    User    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, parentId])
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  therapistId String
+  therapist   User      @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  phone       String?
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+enum LessonFormat {
+  OFFLINE
+  ONLINE
+}
+
+enum LessonStatus {
+  PLANNED
+  DONE
+  CANCELED
+  MISSED
+}
+
+model LessonSeries {
+  id          String    @id @default(cuid())
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  weekday     Int // 1 = понедельник ... 7 = воскресенье
+  time        String // "16:30"
+  durationMin Int       @default(45)
+  startDate   DateTime
+  endDate     DateTime?
+  lessons     Lesson[]
+}
+
+model Lesson {
+  id             String        @id @default(cuid())
+  therapistId    String
+  therapist      User          @relation("TherapistLessons", fields: [therapistId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  seriesId       String?
+  series         LessonSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  startsAt       DateTime
+  durationMin    Int           @default(45)
+  format         LessonFormat  @default(OFFLINE)
+  status         LessonStatus  @default(PLANNED)
+  note           String? // заметка логопеда
+  noteForParent  String? // что увидит родитель
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+
+  @@index([therapistId, startsAt])
+  @@index([studentId, startsAt])
+}
+
+model Tariff {
+  id           String         @id @default(cuid())
+  therapistId  String
+  therapist    User           @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  name         String
+  lessonsCount Int
+  price        Int // в рублях
+  validDays    Int? // срок действия
+  archived     Boolean        @default(false)
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id           String    @id @default(cuid())
+  therapistId  String
+  therapist    User      @relation("TherapistSubscriptions", fields: [therapistId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  tariffId     String?
+  tariff       Tariff?   @relation(fields: [tariffId], references: [id], onDelete: SetNull)
+  name         String
+  lessonsTotal Int
+  price        Int
+  startDate    DateTime  @default(now())
+  expiresAt    DateTime?
+  closed       Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  lessons      Lesson[]
+  payments     Payment[]
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  ONLINE
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  therapistId    String
+  therapist      User          @relation("TherapistPayments", fields: [therapistId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  amount         Int
+  method         PaymentMethod @default(TRANSFER)
+  paidAt         DateTime      @default(now())
+  comment        String?
+}
+
+enum MaterialType {
+  FILE
+  LINK
+  VIDEO
+  TEXT
+}
+
+model Material {
+  id          String       @id @default(cuid())
+  ownerId     String? // null = общий материал платформы (добавляет админ)
+  owner       User?        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  type        MaterialType
+  url         String?
+  text        String?
+  tags        String[]
+  createdAt   DateTime     @default(now())
+  attachments Attachment[]
+  homeworks   HomeworkMaterial[]
+}
+
+enum HomeworkStatus {
+  ASSIGNED
+  SUBMITTED
+  REVIEWED
+}
+
+model Homework {
+  id           String         @id @default(cuid())
+  therapistId  String
+  therapist    User           @relation("TherapistHomeworks", fields: [therapistId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  title        String
+  instructions String?
+  dueDate      DateTime?
+  status       HomeworkStatus @default(ASSIGNED)
+  feedback     String?
+  grade        Int? // 1..5 звёзд
+  createdAt    DateTime       @default(now())
+  materials    HomeworkMaterial[]
+  submissions  HomeworkSubmission[]
+}
+
+model HomeworkMaterial {
+  homeworkId String
+  materialId String
+  homework   Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@id([homeworkId, materialId])
+}
+
+model HomeworkSubmission {
+  id          String       @id @default(cuid())
+  homeworkId  String
+  homework    Homework     @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comment     String?
+  createdAt   DateTime     @default(now())
+  attachments Attachment[]
+}
+
+model Attachment {
+  id           String              @id @default(cuid())
+  path         String
+  name         String
+  mime         String
+  size         Int
+  uploadedById String
+  uploadedBy   User                @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  materialId   String?
+  material     Material?           @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  submissionId String?
+  submission   HomeworkSubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime            @default(now())
+}
+
+// Этапы работы над звуком
+enum SoundStage {
+  NOT_STARTED
+  STAGING // постановка
+  SYLLABLES // автоматизация в слогах
+  WORDS // в словах
+  PHRASES // во фразах
+  DIFFERENTIATION // дифференциация
+  SPEECH // введён в речь
+}
+
+model SoundProgress {
+  id        String     @id @default(cuid())
+  studentId String
+  student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sound     String
+  stage     SoundStage @default(NOT_STARTED)
+  updatedAt DateTime   @updatedAt
+
+  @@unique([studentId, sound])
+}
+
+model SoundProgressLog {
+  id        String     @id @default(cuid())
+  studentId String
+  student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  sound     String
+  stage     SoundStage
+  createdAt DateTime   @default(now())
+}
+
+model DiagnosticForm {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  templateKey String
+  answers     Json
+  filledById  String
+  filledBy    User     @relation(fields: [filledById], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+}
