@@ -5,6 +5,11 @@ import { addDays, addWeeks, setHours, setMinutes, startOfDay, startOfWeek, subWe
 const db = new PrismaClient();
 
 async function main() {
+  // Без --reset не трогаем базу, где уже есть пользователи (безопасно запускать при каждом старте демо)
+  if (!process.argv.includes("--reset") && (await db.user.count()) > 0) {
+    console.log("В базе уже есть данные, демо не загружаю (для перезаливки: npm run db:seed -- --reset)");
+    return;
+  }
   await db.user.deleteMany();
   const passwordHash = await bcrypt.hash("demo123", 10);
 
