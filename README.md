@@ -20,7 +20,7 @@
 cp .env.example .env          # пропишите DATABASE_URL и AUTH_SECRET
 npm install
 npx prisma migrate dev        # создаст таблицы
-npm run db:seed               # демо-данные
+npm run db:seed               # демо-данные (перезалить: npm run db:seed -- --reset)
 npm run dev                   # http://localhost:3000
 ```
 
@@ -33,6 +33,15 @@ AUTH_SECRET=$(openssl rand -base64 32) docker compose up -d --build
 ```
 
 Поднимет PostgreSQL и приложение на порту 3000, миграции применяются при старте. Файлы хранятся в томе `uploads`. Данные детей — персональные данные, поэтому сервер должен быть в России (152-ФЗ): Timeweb Cloud, Selectel, Yandex Cloud.
+
+## Демо-стенд на Render
+
+В репозитории есть `render.yaml`: Render поднимет приложение и PostgreSQL из GitHub, при каждом пуше в `main` обновит стенд.
+
+1. Зайти на [render.com](https://render.com) через GitHub.
+2. New → Blueprint → выбрать репозиторий `logoapp` → Apply.
+
+При первом запуске загрузятся демо-данные, на странице входа будут демо-логины. Ограничения бесплатного тарифа: сервис засыпает после 15 минут без запросов (первое открытие ~1 минута), загруженные файлы пропадают при перезапуске, бесплатная база живёт 30 дней. Для реальных учеников нужен сервер в России (см. выше).
 
 ## Мобильные приложения
 
