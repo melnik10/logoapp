@@ -11,7 +11,7 @@ export default function LoginPage() {
         Вы логопед и ещё не с нами?{" "}
         <Link href="/register" className="font-medium text-violet-700 hover:underline">Зарегистрироваться</Link>
       </p>
-      {process.env.NODE_ENV !== "production" && (
+      {(process.env.NODE_ENV !== "production" || process.env.SHOW_DEMO_LOGINS === "1") && (
         <div className="mt-6 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
           Демо: логопед <b>logoped@demo.ru</b>, родитель <b>+79990000001</b>, админ <b>admin@demo.ru</b>. Пароль у всех <b>demo123</b>.
         </div>
